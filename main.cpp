@@ -3,7 +3,9 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
+#include <queue>
 using namespace std;
+
 string title;
 string getIdBook(string& row) {
     string id = "";
@@ -13,6 +15,7 @@ string getIdBook(string& row) {
     }
     return id;
 }
+
 int partition(vector<string>& data, int l, int r) {
     int i = l - 1, j = r;
     string v = data[r];
@@ -28,11 +31,59 @@ int partition(vector<string>& data, int l, int r) {
     return i;
 }
 
-void quickSort(vector<string>& data, int l, int r) {
-    if (l >= r) return;
-    int p = partition(data, l, r);
-    quickSort(data, l, p - 1);
-    quickSort(data, p + 1, r);
+void quickSort(vector<string>& data, int l, int r){
+	if(l >= r) return;
+	int p = partition(data, l, r);
+	quickSort(data, l, p - 1);
+	quickSort(data, p + 1, r);
+}
+
+struct minHeapNode {
+    string element;
+    int pos;
+    minHeapNode(string element, int pos) {
+        this->element = element;
+        this->pos = pos;
+    }
+};
+
+struct compare {
+    bool operator() (minHeapNode& x, minHeapNode& y) {
+        return getIdBook(x.element) > getIdBook(y.element);
+    }
+};
+
+void mergeFile(int numFile) {
+    vector<fstream> f(numFile + 1);
+    priority_queue<minHeapNode, vector<minHeapNode>, compare> pq;
+    for (int i = 1; i <= numFile; ++i) {
+        stringstream ss;
+        ss << "file_" << i << ".csv";
+        f[i].open(ss.str(), ios::in | ios::binary);
+        string row;
+        if (!f[i].eof()) {
+            getline(f[i], row);
+            pq.push(minHeapNode(row, i));
+        }    
+    }
+    fstream fout;
+    fout.open("fileSorted.csv", ios::out | ios::binary);
+    fout << title << '\n';
+    while (pq.size()) {
+        string row = pq.top().element;
+        int pos = pq.top().pos;
+        pq.pop();
+        if (row == "") continue;
+        fout << row << '\n';
+        if (!f[pos].eof()) {
+            getline(f[pos], row);
+            pq.push(minHeapNode(row, pos));
+        }
+    }
+    fout.close();
+    for (int i = 1; i <= numFile; ++i) {
+        f[i].close();
+    }
 }
 
 void sortAndWrite(vector<string>& data, int numFile) {
@@ -47,7 +98,6 @@ void sortAndWrite(vector<string>& data, int numFile) {
     fout.close();
 }
 
-
 int splitFile(fstream& fin, int memoryLimit) {
     vector<string> data;
     string row;
@@ -58,30 +108,28 @@ int splitFile(fstream& fin, int memoryLimit) {
         if (curMem + row.length() + 1 <= memoryLimit) {
             curMem += row.length() + 1;
             data.push_back(row);
-        }
-        else {
-            cout << "-> File " << numFile << " was created !\n";
+        } else { 
             sortAndWrite(data, numFile);
-            cout << "-> File " << numFile << " was sorted !\n";
             numFile++;
             data.clear();
             data.push_back(row);
             curMem = row.length() + 1;
         }
     }
-    data.pop_back(); 
+    data.pop_back();
     sortAndWrite(data, numFile);
     data.clear();
     return numFile;
 }
 
 int main() {
-  
     cout << "Spliting file Books_rating.csv....\n";
     fstream fin;
     fin.open("Books_rating.csv", ios::in | ios::binary);
     int memoryLimit = 3e8;
     int numFile = splitFile(fin, memoryLimit);
     fin.close();
+    mergeFile(numFile);
     return 0;
 }
+ 
