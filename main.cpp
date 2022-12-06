@@ -8,6 +8,7 @@ using namespace std;
 
 string title; // The 1st row of file csv
 
+//Get id field
 string getIdBook(string& row) {
     string id = "";
     int i = 0; 
@@ -28,6 +29,7 @@ struct minHeapNode {
     }
 };
 
+//Compare 2 ids of 2 elements
 struct compare {
     bool operator() (minHeapNode& x, minHeapNode& y) {
         return getIdBook(x.element) > getIdBook(y.element);
@@ -36,6 +38,8 @@ struct compare {
 
 void mergeFile(int numFile) {
     vector<fstream> f(numFile + 1);
+
+    //Priority_queue data structure defined by min heap
     priority_queue<minHeapNode, vector<minHeapNode>, compare> pq;
 
     //Open all files and push first element into Priority_queue
@@ -60,7 +64,7 @@ void mergeFile(int numFile) {
         int pos = pq.top().pos;
         pq.pop();
         if (row == "") continue;
-        fout << row << '\n';
+        fout << row << '\n';  
         if (!f[pos].eof()) {
             getline(f[pos], row);
             pq.push(minHeapNode(row, pos));
@@ -90,30 +94,39 @@ int partition(vector<string>& data, int l, int r) {
     return i;
 }
 
+//Quick sort memory optimize
 void quickSort(vector<string>& data, int l, int r) {
-	if(l >= r) return;
-	int p = partition(data, l, r);
-	quickSort(data, l, p - 1);
-	quickSort(data, p + 1, r);
+    while (l < r) {
+        int p = partition(data, l, r);
+        if (p - l < r - p) {
+            quickSort(data, l, p - 1);
+            l = p + 1;
+        } else  {
+            quickSort(data, p + 1, r);
+            r = p - 1;
+        }
+    }
 }
 
 void sortAndWrite(vector<string>& data, int numFile) {
+    //Sort data using quick sort algorithm
     quickSort(data, 0, data.size() - 1);
+
+    //Write data into file
     fstream fout;
     stringstream ss;
     ss << "file_" << numFile << ".csv";
     fout.open(ss.str(), ios::out | ios::binary);
-
     for (string x : data) {
         fout << x << '\n';
     }
     fout.close();
 }
 
-int splitFile(fstream& fin, int chunkSize) {
+int readFileInChunk(fstream& fin, int chunkSize) {
     vector<string> data;
     string row;
-    getline(fin, title);
+    getline(fin, title); //Get title line
     int numFile = 1, curMem = title.length() + 1;
     
     while (!fin.eof()) {
@@ -121,9 +134,9 @@ int splitFile(fstream& fin, int chunkSize) {
         if (curMem + row.length() + 1 <= chunkSize) {
             curMem += row.length() + 1;
             data.push_back(row);
-        } else { // Memory limited exceeded
+        } else { // Memory > ChunkSize
             sortAndWrite(data, numFile);
-            cout << "   + Created and Sorted file " << numFile << '\n';
+            cout << "   + Created and sorted file " << numFile << '\n';
             numFile++;
             data.clear();
             data.push_back(row);
@@ -136,7 +149,7 @@ int splitFile(fstream& fin, int chunkSize) {
         data.pop_back();
     }
     sortAndWrite(data, numFile);
-    cout << "   + Created and Sorted file " << numFile << '\n';
+    cout << "   + Created and sorted file " << numFile << '\n';
     data.clear();
     return numFile;
 }
@@ -146,8 +159,7 @@ int main() {
     fstream fin;
     fin.open("Books_rating.csv", ios::in | ios::binary);
     int chunkSize = 200000000; // bytes
-    //Split file "Books_rating.csv" into multiple chunks
-    int numFile = splitFile(fin, chunkSize);
+    int numFile = readFileInChunk(fin, chunkSize);
     fin.close();
 
     cout << "- Merging " << numFile << " sorted files....\n";
